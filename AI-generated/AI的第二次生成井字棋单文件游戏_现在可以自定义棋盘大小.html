@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Custom Tic-Tac-Toe / Gomoku</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f9fbfd;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 15px;
+    }
+
+    h1 {
+      color: #2c3e50;
+      margin-bottom: 8px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    button {
+      padding: 8px 16px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    #settingsBtn {
+      background: #3498db;
+      color: white;
+    }
+    #settingsBtn:hover { background: #2980b9; }
+
+    #restartBtn {
+      background: #2ecc71;
+      color: white;
+    }
+    #restartBtn:hover { background: #27ae60; }
+
+    /* Settings Panel */
+    #settingsPanel {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+      max-width: 500px;
+      width: 100%;
+      display: none;
+    }
+
+    .setting-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 12px 0;
+    }
+
+    label {
+      font-weight: bold;
+      color: #2c3e50;
+      min-width: 120px;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      margin: 0 10px;
+    }
+
+    input[type="number"] {
+      width: 70px;
+      padding: 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    #applySettings {
+      background: #e67e22;
+      color: white;
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+    }
+    #applySettings:hover { background: #d35400; }
+
+    /* Game Status */
+    #status {
+      font-size: 1.2rem;
+      margin: 15px 0;
+      min-height: 28px;
+      color: #e74c3c;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    /* Board */
+    #board {
+      display: grid;
+      gap: 2px;
+      background: #bbb;
+      padding: 4px;
+      border-radius: 6px;
+      max-width: 90vw;
+      max-height: 70vh;
+      overflow: auto;
+      margin-bottom: 15px;
+    }
+
+    .cell {
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.2s;
+    }
+
+    .cell:hover:not(.taken) {
+      background: #f0f8ff;
+    }
+
+    .cell.taken {
+      cursor: not-allowed;
+    }
+
+    .cell.x { color: #e74c3c; }
+    .cell.o { color: #3498db; }
+
+    .winning-cell {
+      background: #ffeaa7 !important;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+
+    h5.note {
+      color: #7f8c8d;
+      font-style: italic;
+      margin-top: 10px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Custom Tic-Tac-Toe / Gomoku</h1>
+    <div class="controls">
+      <button id="settingsBtn">⚙️ Settings</button>
+      <button id="restartBtn">🔄 Restart Game</button>
+    </div>
+  </header>
+
+  <div id="settingsPanel">
+    <div class="setting-row">
+      <label for="rows">Rows (1–100):</label>
+      <input type="range" id="rowsSlider" min="1" max="100" value="8">
+      <input type="number" id="rowsInput" min="1" max="100" value="8">
+    </div>
+    <div class="setting-row">
+      <label for="cols">Columns (1–100):</label>
+      <input type="range" id="colsSlider" min="1" max="100" value="8">
+      <input type="number" id="colsInput" min="1" max="100" value="8">
+    </div>
+    <button id="applySettings">✅ Apply & Start New Game</button>
+  </div>
+
+  <div id="status">Player X's turn</div>
+  <div id="board"></div>
+  <h5 class="note">Note: Win by getting 5 in a row (horizontal, vertical, or diagonal).</h5>
+
+  <script>
+    // Configurable constants
+    const MAX_SIZE = 100;
+    const WIN_LENGTH = 5; // 5-in-a-row to win
+
+    // DOM Elements
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsPanel = document.getElementById('settingsPanel');
+    const restartBtn = document.getElementById('restartBtn');
+    const applySettingsBtn = document.getElementById('applySettings');
+    const rowsSlider = document.getElementById('rowsSlider');
+    const colsSlider = document.getElementById('colsSlider');
+    const rowsInput = document.getElementById('rowsInput');
+    const colsInput = document.getElementById('colsInput');
+    const statusDisplay = document.getElementById('status');
+    const boardElement = document.getElementById('board');
+
+    // Sync sliders and inputs
+    rowsSlider.addEventListener('input', () => {
+      rowsInput.value = rowsSlider.value;
+    });
+    rowsInput.addEventListener('input', () => {
+      let val = Math.min(MAX_SIZE, Math.max(1, parseInt(rowsInput.value) || 1));
+      rowsInput.value = val;
+      rowsSlider.value = val;
+    });
+
+    colsSlider.addEventListener('input', () => {
+      colsInput.value = colsSlider.value;
+    });
+    colsInput.addEventListener('input', () => {
+      let val = Math.min(MAX_SIZE, Math.max(1, parseInt(colsInput.value) || 1));
+      colsInput.value = val;
+      colsSlider.value = val;
+    });
+
+    settingsBtn.addEventListener('click', () => {
+      settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
+    });
+
+    // Game state
+    let rows = 8;
+    let cols = 8;
+    let board = [];
+    let currentPlayer = 'X';
+    let gameActive = true;
+
+    function initBoard(r, c) {
+      rows = r;
+      cols = c;
+      board = Array(rows).fill().map(() => Array(cols).fill(''));
+      gameActive = true;
+      currentPlayer = 'X';
+      statusDisplay.textContent = "Player X's turn";
+
+      // Clear board
+      boardElement.innerHTML = '';
+      boardElement.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+      boardElement.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+
+      // Set cell size (responsive)
+      const cellSize = Math.min(60, Math.max(20, 500 / Math.max(rows, cols)));
+      boardElement.style.width = `${cols * (cellSize + 2)}px`;
+      boardElement.style.height = `${rows * (cellSize + 2)}px`;
+
+      // Create cells
+      for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          cell.dataset.row = i;
+          cell.dataset.col = j;
+          cell.style.fontSize = `${cellSize * 0.6}px`;
+          cell.addEventListener('click', handleCellClick);
+          boardElement.appendChild(cell);
+        }
+      }
+    }
+
+    function handleCellClick(e) {
+      if (!gameActive) return;
+      const row = parseInt(e.target.dataset.row);
+      const col = parseInt(e.target.dataset.col);
+      if (board[row][col] !== '') return;
+
+      board[row][col] = currentPlayer;
+      e.target.textContent = currentPlayer;
+      e.target.classList.add('taken', currentPlayer.toLowerCase());
+
+      if (checkWin(row, col)) {
+        endGame(false);
+      } else if (isBoardFull()) {
+        endGame(true);
+      } else {
+        currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+        statusDisplay.textContent = `Player ${currentPlayer}'s turn`;
+      }
+    }
+
+    function checkWin(row, col) {
+      const player = board[row][col];
+      const directions = [
+        [0, 1],   // horizontal
+        [1, 0],   // vertical
+        [1, 1],   // diagonal \
+        [1, -1]   // diagonal /
+      ];
+
+      for (const [dx, dy] of directions) {
+        let count = 1; // current cell
+
+        // Positive direction
+        for (let i = 1; i < WIN_LENGTH; i++) {
+          const r = row + dx * i;
+          const c = col + dy * i;
+          if (r >= 0 && r < rows && c >= 0 && c < cols && board[r][c] === player) {
+            count++;
+          } else break;
+        }
+
+        // Negative direction
+        for (let i = 1; i < WIN_LENGTH; i++) {
+          const r = row - dx * i;
+          const c = col - dy * i;
+          if (r >= 0 && r < rows && c >= 0 && c < cols && board[r][c] === player) {
+            count++;
+          } else break;
+        }
+
+        if (count >= WIN_LENGTH) {
+          highlightWinningLine(row, col, dx, dy);
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function highlightWinningLine(row, col, dx, dy) {
+      const player = board[row][col];
+      const cells = document.querySelectorAll('.cell');
+
+      // Collect all cells in the winning line
+      const winningCoords = new Set();
+      winningCoords.add(`${row},${col}`);
+
+      for (let i = 1; i < WIN_LENGTH; i++) {
+        const r = row + dx * i;
+        const c = col + dy * i;
+        if (r >= 0 && r < rows && c >= 0 && c < cols && board[r][c] === player) {
+          winningCoords.add(`${r},${c}`);
+        } else break;
+      }
+      for (let i = 1; i < WIN_LENGTH; i++) {
+        const r = row - dx * i;
+        const c = col - dy * i;
+        if (r >= 0 && r < rows && c >= 0 && c < cols && board[r][c] === player) {
+          winningCoords.add(`${r},${c}`);
+        } else break;
+      }
+
+      cells.forEach(cell => {
+        const r = cell.dataset.row;
+        const c = cell.dataset.col;
+        if (winningCoords.has(`${r},${c}`)) {
+          cell.classList.add('winning-cell');
+        }
+      });
+    }
+
+    function isBoardFull() {
+      return board.every(row => row.every(cell => cell !== ''));
+    }
+
+    function endGame(isDraw) {
+      gameActive = false;
+      if (isDraw) {
+        statusDisplay.textContent = "It's a draw!";
+      } else {
+        statusDisplay.textContent = `Player ${currentPlayer} wins! 🎉`;
+      }
+    }
+
+    // Event Listeners
+    restartBtn.addEventListener('click', () => initBoard(rows, cols));
+    applySettingsBtn.addEventListener('click', () => {
+      const r = parseInt(rowsInput.value);
+      const c = parseInt(colsInput.value);
+      initBoard(r, c);
+      settingsPanel.style.display = 'none';
+    });
+
+    // Start default game
+    initBoard(8, 8);
+  </script>
+</body>
+</html>
