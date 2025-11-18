@@ -1,0 +1,2 @@
+# sSTaFC
+some_Scattered_Thoughts_and_Fragmented_Code
